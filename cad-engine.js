@@ -65,6 +65,7 @@
       join(rim[0],wall[1],true); // underside of handle expansion
       join(rim[1],inner[3]); // top annulus, outward +Z
     } else {
+      // Polygon circumscribes a 6 mm circle; the clear inscribed diameter is 6 mm.
       const r=RULES.holeDiameter/2/Math.cos(Math.PI/n);
       const hole=contour.map((_,i)=>[r*Math.cos(TAU*i/n),r*Math.sin(TAU*i/n)]);
       const inner=[ring(hole,0),ring(hole,RULES.keyringHeight)];
@@ -80,18 +81,15 @@
     const design = DESIGNS.find(d => d.id === id);
     if (!design) throw new Error('Unknown design: ' + id);
     const outerProfile = profile(design), solids = [shell(design,outerProfile)], sections = [];
-    function band(inner, outer, bottom, top, label, thickness) {
+    function band(bottom, top, label, thickness) {
       sections.push({ label, bottom, top, thickness });
     }
     if (design.type === 'cutter') {
-      band(outerProfile,offset(outerProfile,RULES.lip),0,1.5,'cutting lip',RULES.lip);
-      band(outerProfile,offset(outerProfile,RULES.wall),1.5,RULES.height-RULES.rimHeight,'main wall',RULES.wall);
-      band(outerProfile,offset(outerProfile,RULES.rimWidth),RULES.height-RULES.rimHeight,RULES.height,'top handle rim',RULES.rimWidth);
+      band(0,1.5,'cutting lip',RULES.lip);
+      band(1.5,RULES.height-RULES.rimHeight,'main wall',RULES.wall);
+      band(RULES.height-RULES.rimHeight,RULES.height,'top handle rim',RULES.rimWidth);
     } else {
-      // Polygon circumscribes a 6 mm circle; the clear inscribed diameter is 6 mm.
-      const r = RULES.holeDiameter/2/Math.cos(Math.PI/design.sectors);
-      const hole = outerProfile.map((_,i) => [r*Math.cos(TAU*i/design.sectors),r*Math.sin(TAU*i/design.sectors)]);
-      band(hole,outerProfile,0,RULES.keyringHeight,'FuseRing body',null);
+      band(0,RULES.keyringHeight,'FuseRing body',null);
     }
     const triangles = solids.flatMap(s => s.triangles);
     const points = solids.flatMap(s => s.vertices);
