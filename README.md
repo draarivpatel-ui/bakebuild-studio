@@ -5,7 +5,7 @@ Zero-dependency local CAD workbench for three custom cookie cutters and one Orph
 From the repository root, regenerate the checked-in exports:
 
 ```sh
-node artifacts/bakebuild-studio/cli.js
+node cli.js
 node --test
 ```
 
