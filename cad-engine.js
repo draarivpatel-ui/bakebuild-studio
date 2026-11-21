@@ -13,8 +13,13 @@
   const RULES = Object.freeze({ lip: 0.8, wall: 2, height: 12.7, rimWidth: 5, rimHeight: 2, holeDiameter: 6, keyringHeight: 4 });
   const sub = (a, b) => a.map((v, i) => v - b[i]);
   const cross = (a, b) => [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]];
-  const unit = a => { const m = Math.hypot(...a); return a.map(v => v / m); };
-  const number = v => { const s = (Math.abs(v) < 1e-9 ? 0 : v).toFixed(6).replace(/0+$/, ''); return s.includes('.') ? s : s + '.'; };
+  const unit = a => { const m = Math.hypot(...a); return m > 0 && Number.isFinite(m) ? a.map(v => v / m) : a.map(() => 0); };
+  const number = v => {
+    if (!Number.isFinite(v)) return '0.';
+    if (Math.abs(v) >= 1e21) return v.toExponential(6).replace('e', 'E');
+    const s = (Math.abs(v) < 1e-9 ? 0 : v).toFixed(6).replace(/0+$/, '');
+    return /^-?\d+$/.test(s) ? s + '.' : s;
+  };
   function profile(design) {
     return Array.from({ length: design.sectors }, (_, i) => {
       const a = TAU * i / design.sectors;
@@ -45,19 +50,114 @@
   function signedVolume(triangles) {
     return triangles.reduce((s, t) => s + t[0].reduce((v, c, i) => v+c*cross(t[1],t[2])[i], 0)/6, 0);
   }
+  // Counts proper crossings between non-adjacent edges of a closed 2D polygon.
+  // Endpoint touches and shared vertices do not count as self-intersections.
+  function polygonSelfIntersections(points) {
+    const n = points.length;
+    let count = 0;
+    for (let i = 0; i < n; i++) {
+      const a1 = points[i], a2 = points[(i + 1) % n];
+      const d1x = a2[0]-a1[0], d1y = a2[1]-a1[1];
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue;
+        const b1 = points[j], b2 = points[(j + 1) % n];
+        const d2x = b2[0]-b1[0], d2y = b2[1]-b1[1];
+        const denom = d1x*d2y-d1y*d2x;
+        if (Math.abs(denom) < 1e-12) continue;
+        const t = ((b1[0]-a1[0])*d2y-(b1[1]-a1[1])*d2x)/denom;
+        const u = ((b1[0]-a1[0])*d1y-(b1[1]-a1[1])*d1x)/denom;
+        if (t > 1e-9 && t < 1-1e-9 && u > 1e-9 && u < 1-1e-9) count++;
+      }
+    }
+    return count;
+  }
+  // Edge-sharing census of a triangle soup: boundary edges are used once,
+  // non-manifold edges more than twice, flipped edges repeat a direction.
+  function manifoldReport(triangles) {
+    const key = p => p.map(c => Number.isFinite(c) ? Math.round(c*1e6) : c).join(',');
+    const edges = new Map();
+    let degenerate = 0, nan = 0;
+    for (const t of triangles) {
+      if (t.flat().some(c => !Number.isFinite(c))) nan++;
+      if (Math.hypot(...cross(sub(t[1], t[0]), sub(t[2], t[0]))) < 1e-9) degenerate++;
+      for (let e = 0; e < 3; e++) {
+        const a = key(t[e]), b = key(t[(e + 1) % 3]);
+        const undirected = a < b ? a+'|'+b : b+'|'+a;
+        const rec = edges.get(undirected) || { count: 0, dirs: new Set() };
+        rec.count++; rec.dirs.add(a+'>'+b); edges.set(undirected, rec);
+      }
+    }
+    let boundary = 0, nonManifold = 0, flipped = 0;
+    for (const rec of edges.values()) {
+      if (rec.count === 1) boundary++;
+      else if (rec.count > 2) nonManifold++;
+      if (rec.dirs.size !== rec.count) flipped++;
+    }
+    return { edges: edges.size, boundary, nonManifold, flipped, degenerate, nan };
+  }
+  // Newell-Newell-Sancha depth ordering for painter's-algorithm rendering.
+  // Input is camera-space triangles where larger z is nearer the viewer;
+  // output is the same triangles ordered farthest-first. Screen-overlapping
+  // pairs whose depth ranges overlap are resolved by plane-side tests, so
+  // centroid disagreements no longer produce inverted pixels.
+  function depthSort(triangles) {
+    const EPS = 1e-9;
+    const items = triangles.map(t => {
+      const n = cross(sub(t[1], t[0]), sub(t[2], t[0]));
+      const xs = [t[0][0], t[1][0], t[2][0]], ys = [t[0][1], t[1][1], t[2][1]], zs = [t[0][2], t[1][2], t[2][2]];
+      return { t, n, d: n[0]*t[0][0]+n[1]*t[0][1]+n[2]*t[0][2],
+        xmin: Math.min(...xs), xmax: Math.max(...xs),
+        ymin: Math.min(...ys), ymax: Math.max(...ys),
+        zmin: Math.min(...zs), zmax: Math.max(...zs), defers: 0 };
+    });
+    items.sort((a, b) => a.zmin-b.zmin || a.zmax-b.zmax);
+    const out = [];
+    while (items.length) {
+      const P = items[0], vsP = Math.sign(P.n[2]);
+      let defer = false;
+      for (let j = 1; j < items.length; j++) {
+        const Q = items[j];
+        if (Q.zmin > P.zmax + EPS) continue; // deferred items break the zmin order, so scan all
+        if (Q.xmin > P.xmax || Q.xmax < P.xmin || Q.ymin > P.ymax || Q.ymax < P.ymin) continue;
+        let safe = false;
+        if (vsP) {
+          safe = true;
+          for (const v of Q.t) if ((P.n[0]*v[0]+P.n[1]*v[1]+P.n[2]*v[2]-P.d)*vsP < -EPS) { safe = false; break; }
+        }
+        if (!safe) {
+          const vsQ = Math.sign(Q.n[2]);
+          if (vsQ) {
+            safe = true;
+            for (const v of P.t) if ((Q.n[0]*v[0]+Q.n[1]*v[1]+Q.n[2]*v[2]-Q.d)*vsQ > EPS) { safe = false; break; }
+          }
+        }
+        if (!safe) { defer = true; break; }
+      }
+      if (!defer || P.defers >= items.length) { out.push(P.t); items.shift(); }
+      else { P.defers++; items.push(items.shift()); }
+    }
+    return out;
+  }
   function shell(design, contour) {
     const vertices = [], faces = [], n = contour.length;
     function ring(points, z) { return points.map(p => { vertices.push([...p,z]); return vertices.length-1; }); }
     function join(a,b,reverse=false) {
       for(let i=0;i<n;i++) { const j=(i+1)%n, face=[a[i],a[j],b[j],b[i]]; faces.push(reverse?face.reverse():face); }
     }
+    const baseCrossings = polygonSelfIntersections(contour);
+    if (baseCrossings) throw new Error('Self-intersecting base contour ('+baseCrossings+' crossings) for '+design.id);
     if(design.type==='cutter') {
       const levels=[0,1.5,RULES.height-RULES.rimHeight,RULES.height];
       const inner=levels.map(z=>ring(contour,z));
       const lip=cutterRing(RULES.lip,levels[0],levels[1]);
       const wall=cutterRing(RULES.wall,levels[1],levels[2]);
       const rim=cutterRing(RULES.rimWidth,levels[2],levels[3]);
-      function cutterRing(width,bottom,top) { const p=offset(contour,width); return [ring(p,bottom),ring(p,top)]; }
+      function cutterRing(width,bottom,top) {
+        const p=offset(contour,width);
+        const crossings=polygonSelfIntersections(p);
+        if (crossings) throw new Error('Self-intersecting '+width+' mm offset contour ('+crossings+' crossings) for '+design.id);
+        return [ring(p,bottom),ring(p,top)];
+      }
       for(let i=0;i<3;i++) join(inner[i],inner[i+1],true);
       for(const band of [lip,wall,rim]) join(band[0],band[1]);
       join(lip[0],inner[0],true); // bottom annulus, outward -Z
@@ -115,6 +215,29 @@
     } else {
       checks.push({rule:'Flat bottom at z = 0',pass:Math.abs(model.bounds.min[2])<1e-7,actual:model.bounds.min[2],target:0});
       checks.push({rule:'Carabiner clear hole >= 5 mm',pass:model.holeDiameter>=5,actual:model.holeDiameter,target:5});
+    }
+    if (Array.isArray(model.solids)) {
+      checks.push({rule:'Solid bodies present',pass:model.solids.length>0,actual:model.solids.length});
+    }
+    if (Array.isArray(model.triangles)) {
+      const report = manifoldReport(model.triangles);
+      checks.push(
+        {rule:'Triangulated surface present',pass:model.triangles.length>0,actual:model.triangles.length},
+        {rule:'Finite vertex coordinates',pass:report.nan===0,actual:report.nan},
+        {rule:'No degenerate facets',pass:report.degenerate===0,actual:report.degenerate},
+        {rule:'Closed manifold surface',pass:report.boundary===0&&report.nonManifold===0,actual:{boundaryEdges:report.boundary,nonManifoldEdges:report.nonManifold}},
+        {rule:'Consistent triangle winding',pass:report.flipped===0,actual:report.flipped}
+      );
+      if (Number.isFinite(model.volume) && model.triangles.length) {
+        const meshVolume = signedVolume(model.triangles);
+        checks.push({rule:'Reported volume matches mesh',pass:meshVolume>0&&Math.abs(meshVolume-model.volume)<=Math.max(1e-6,Math.abs(meshVolume)*1e-9),actual:meshVolume,reported:model.volume});
+      }
+    }
+    if (DESIGNS.some(d => d.id === model.id && d.type === model.type)) {
+      const contour = profile(model);
+      let crossings = polygonSelfIntersections(contour);
+      if (model.type === 'cutter') for (const width of [RULES.lip, RULES.wall, RULES.rimWidth]) crossings += polygonSelfIntersections(offset(contour, width));
+      checks.push({rule:'Contours are simple polygons',pass:crossings===0,actual:crossings});
     }
     return { pass:checks.every(c=>c.pass), checks };
   }
@@ -178,10 +301,7 @@
     add('SHAPE_DEFINITION_REPRESENTATION('+shape+','+representation+')');
     return ['ISO-10303-21;','HEADER;',"FILE_DESCRIPTION(('Parametric faceted millimetre manifold solid'),'2;1');","FILE_NAME('"+model.id+".step','2026-11-04T00:00:00',('BakeBuild Studio'),('BakeBuild'),'BakeBuild CAD','BakeBuild CAD','');","FILE_SCHEMA(('AUTOMOTIVE_DESIGN'));",'ENDSEC;','DATA;',...data,'ENDSEC;','END-ISO-10303-21;',''].join('\n');
   }
-  const api = { DESIGNS, RULES, generate, validate, toSTEP, toSTL, profile, offset, signedVolume };
+  const api = { DESIGNS, RULES, generate, validate, toSTEP, toSTL, profile, offset, signedVolume, polygonSelfIntersections, manifoldReport, depthSort };
   if (typeof module==='object'&&module.exports) module.exports=api;
   root.BakeBuildCAD=api;
 })(typeof globalThis!=='undefined'?globalThis:this);
-const CAD = globalThis.BakeBuildCAD;
-export const { DESIGNS, RULES, generate, validate, toSTEP, toSTL, profile, offset, signedVolume } = CAD;
-export default CAD;

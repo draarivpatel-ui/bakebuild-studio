@@ -4,7 +4,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import CAD from './cad-engine.js';
+import './cad-engine.js';
+const CAD = globalThis.BakeBuildCAD;
 const directoryName = path.dirname(fileURLToPath(import.meta.url));
 export function exportAll(directory = path.join(directoryName, 'exports')) {
   fs.mkdirSync(directory, { recursive:true });

@@ -1,6 +1,6 @@
 /* Canvas-based CPU triangle renderer: rotate, zoom, depth-sort, shaded mesh. */
 'use strict';
-import CAD from './cad-engine.js';
+const CAD = globalThis.BakeBuildCAD;
 (() => {
   const canvas=document.getElementById('preview'), ctx=canvas.getContext('2d');
   const select=document.getElementById('design');
@@ -18,8 +18,7 @@ import CAD from './cad-engine.js';
     canvas.width=Math.max(1,Math.round(box.width*dpr)); canvas.height=Math.max(1,Math.round(box.height*dpr)); ctx.setTransform(dpr,0,0,dpr,0,0);
     ctx.fillStyle='#111b26'; ctx.fillRect(0,0,box.width,box.height);
     const scale=Math.min(box.width,box.height)/Math.max(...model.dimensions)*0.72*zoom;
-    const triangles=model.triangles.map(t=>t.map(transform));
-    triangles.sort((a,b)=>a.reduce((s,p)=>s+p[2],0)-b.reduce((s,p)=>s+p[2],0));
+    const triangles=CAD.depthSort(model.triangles.map(t=>t.map(transform)));
     for (const t of triangles) {
       const u=t[1].map((v,i)=>v-t[0][i]),v=t[2].map((v,i)=>v-t[0][i]);
       const n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];

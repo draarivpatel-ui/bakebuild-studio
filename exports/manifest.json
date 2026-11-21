@@ -110,6 +110,50 @@
             "pass": true,
             "actual": 2,
             "target": 2
+          },
+          {
+            "rule": "Solid bodies present",
+            "pass": true,
+            "actual": 1
+          },
+          {
+            "rule": "Triangulated surface present",
+            "pass": true,
+            "actual": 1280
+          },
+          {
+            "rule": "Finite vertex coordinates",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "No degenerate facets",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Closed manifold surface",
+            "pass": true,
+            "actual": {
+              "boundaryEdges": 0,
+              "nonManifoldEdges": 0
+            }
+          },
+          {
+            "rule": "Consistent triangle winding",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Reported volume matches mesh",
+            "pass": true,
+            "actual": 5771.079012867645,
+            "reported": 5771.079012867645
+          },
+          {
+            "rule": "Contours are simple polygons",
+            "pass": true,
+            "actual": 0
           }
         ]
       },
@@ -223,6 +267,50 @@
             "pass": true,
             "actual": 2,
             "target": 2
+          },
+          {
+            "rule": "Solid bodies present",
+            "pass": true,
+            "actual": 1
+          },
+          {
+            "rule": "Triangulated surface present",
+            "pass": true,
+            "actual": 1440
+          },
+          {
+            "rule": "Finite vertex coordinates",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "No degenerate facets",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Closed manifold surface",
+            "pass": true,
+            "actual": {
+              "boundaryEdges": 0,
+              "nonManifoldEdges": 0
+            }
+          },
+          {
+            "rule": "Consistent triangle winding",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Reported volume matches mesh",
+            "pass": true,
+            "actual": 5804.620702977844,
+            "reported": 5804.620702977844
+          },
+          {
+            "rule": "Contours are simple polygons",
+            "pass": true,
+            "actual": 0
           }
         ]
       },
@@ -336,6 +424,50 @@
             "pass": true,
             "actual": 2,
             "target": 2
+          },
+          {
+            "rule": "Solid bodies present",
+            "pass": true,
+            "actual": 1
+          },
+          {
+            "rule": "Triangulated surface present",
+            "pass": true,
+            "actual": 1280
+          },
+          {
+            "rule": "Finite vertex coordinates",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "No degenerate facets",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Closed manifold surface",
+            "pass": true,
+            "actual": {
+              "boundaryEdges": 0,
+              "nonManifoldEdges": 0
+            }
+          },
+          {
+            "rule": "Consistent triangle winding",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Reported volume matches mesh",
+            "pass": true,
+            "actual": 5563.64881994725,
+            "reported": 5563.64881994725
+          },
+          {
+            "rule": "Contours are simple polygons",
+            "pass": true,
+            "actual": 0
           }
         ]
       },
@@ -419,6 +551,50 @@
             "pass": true,
             "actual": 6,
             "target": 5
+          },
+          {
+            "rule": "Solid bodies present",
+            "pass": true,
+            "actual": 1
+          },
+          {
+            "rule": "Triangulated surface present",
+            "pass": true,
+            "actual": 512
+          },
+          {
+            "rule": "Finite vertex coordinates",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "No degenerate facets",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Closed manifold surface",
+            "pass": true,
+            "actual": {
+              "boundaryEdges": 0,
+              "nonManifoldEdges": 0
+            }
+          },
+          {
+            "rule": "Consistent triangle winding",
+            "pass": true,
+            "actual": 0
+          },
+          {
+            "rule": "Reported volume matches mesh",
+            "pass": true,
+            "actual": 8419.951385633056,
+            "reported": 8419.951385633056
+          },
+          {
+            "rule": "Contours are simple polygons",
+            "pass": true,
+            "actual": 0
           }
         ]
       },
