@@ -18,7 +18,7 @@ The STEP writer emits AP214-style product metadata, explicit millimetre, radian,
 
 ## Verification
 
-The upgraded suite has 179 tests across six files and passes on Node 26:
+The upgraded suite has 404 tests across seven files and passes on Node 26:
 
 ```sh
 npm test
@@ -28,7 +28,7 @@ Geometry tests prove determinism, exact band heights, flat bottoms, the 6 mm ins
 
 Export tests re-parse the shipped ASCII STL text and the STEP DATA section rather than trusting the generator. They verify declared facet normals against geometric winding, coordinate-by-coordinate agreement with a fresh `generate()` call, SHA-256 hashes and byte counts, sequential entity ids with no dangling references, exact B-rep entity counts, and a full `exportAll()` regeneration into a temporary directory that matches the checked-in files byte for byte.
 
-DOM tests execute the actual `app.js` module against a small DOM and canvas shim. They cover design switching, check-list rendering, reset, pointer drag and release, clamped wheel zoom, every supported keyboard control, window resize, and both download payloads compared against the shipped exports. Static checks cover doctype, headings, unique ids, label resolution, focus rings, and responsive CSS.
+DOM tests execute the actual `app.js` module against a small DOM and canvas shim. They cover design switching, check-list rendering, reset, pointer drag and release, clamped wheel zoom, every supported keyboard control, window resize, and both download payloads compared against the shipped exports. Static checks cover doctype, headings, unique ids, label resolution, focus rings, and responsive CSS. The lab suite adds known-answer SHA-256 vectors checked against the platform crypto, a four-model topology comparator, cutter-lip and carabiner-hole nozzle wall-ratio sweeps, a strict bookmark-hash codec with hostile-input rejection, one cached digest shared across the JSON, CSV, and Markdown audit exports, and formula-escaped CSV cells.
 
 Compliance gates scan every shipped text file for em-dashes, en-dashes, AI disclosures, model names, and personal contact details. Zero occurrences are allowed. The harness command is:
 
@@ -50,12 +50,13 @@ Browser testing without a browser required a small shim that preserves real even
 - STEP and STL exports that are byte-identical on regeneration and verified by independent parsers.
 - True parallel-offset wall thickness at 0.8 mm, 2.0 mm, and 5.0 mm on every contour vertex.
 - A browser workbench whose downloads are generated from the live model, not stale files.
-- 179 automated checks spanning kernel math, artifact integrity, browser interaction, and compliance.
+- 404 automated checks spanning kernel math, artifact integrity, browser interaction, audit-lab correctness, and compliance.
+- An in-page audit lab with a four-model topology comparator, nozzle wall-ratio sweeps, true-millimetre cross-section charts, SHA-256 stamped JSON/CSV/Markdown audit briefs, and a `#bbs=` bookmark hash that restores the full lab state.
 
 ## What's next
 
-The obvious next steps are curved spline silhouettes with exact analytic offsets, a second STL export mode with a coarser facet budget for small printers, and an in-page clearance calculator for wall thickness versus nozzle diameter. Real food-contact testing, slicer-specific minimum feature checks, and physical fit trials remain outside the scope of a digital geometry prototype.
+The obvious next steps are curved spline silhouettes with exact analytic offsets, a second STL export mode with a coarser facet budget for small printers, and swept-width probes that regenerate the full solid instead of a band estimate. Real food-contact testing, slicer-specific minimum feature checks, and physical fit trials remain outside the scope of a digital geometry prototype.
 
 ## Judge demo
 
-Serve this folder with `python3 -m http.server`, open `index.html`, switch between the three cutters and the keyring, and watch the rule list and dimensions update. Drag and zoom the mesh, then download a STEP file and an STL file. Run `npm test` to see all 179 checks pass and `npm run build` to confirm the exports regenerate without changing a byte.
+Serve this folder with `python3 -m http.server`, open `index.html`, switch between the three cutters and the keyring, and watch the rule list and dimensions update. Drag and zoom the mesh, then download a STEP file and an STL file. Scroll to the audit lab for the comparator table, cross-section and nozzle-ratio charts, digest-stamped exports, the tamper demo, and the in-page self-test runner. Run `npm test` to see all 404 checks pass and `npm run build` to confirm the exports regenerate without changing a byte.

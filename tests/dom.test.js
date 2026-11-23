@@ -9,7 +9,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import '../cad-engine.js';
+import '../cad-lab.js';
 const CAD = globalThis.BakeBuildCAD;
+const LAB = globalThis.BakeBuildLab;
 import { readText, ROOT, complianceTextFiles } from './helpers.js';
 
 const html = readText('index.html');
@@ -145,13 +147,14 @@ class ShimBlob {
   constructor(parts, options = {}) { this.parts = parts; this.options = options; }
 }
 
-async function boot() {
+async function boot(hash) {
   const dom = createDom();
   // The shim stays installed for the lifetime of this test file: app.js
   // registers DOM event handlers that resolve `document` at dispatch time,
   // not only during the initial module evaluation.
   globalThis.document = dom.doc;
   globalThis.window = dom.win;
+  if (hash !== undefined) dom.win.location = { hash, href: 'https://local.test/index.html' + hash };
   globalThis.Blob = ShimBlob;
   globalThis.URL = { createObjectURL: dom.url.createObjectURL, revokeObjectURL: dom.url.revokeObjectURL };
   globalThis.setTimeout = (fn) => { fn(); return 0; };
@@ -169,7 +172,7 @@ test('index.html has HTML5 doctype, language, charset, viewport, and a descripti
   assert.match(html, /<meta name="viewport" content="width=device-width,initial-scale=1">/);
   assert.match(html, /<title>BakeBuild Studio: CAD workbench<\/title>/);
   assert.match(html, /<link rel="stylesheet" href="style.css">/);
-  assert.match(html, /<script src="cad-engine.js"><\/script><script src="app.js"><\/script>/);
+  assert.match(html, /<script src="cad-engine.js"><\/script><script src="cad-lab.js"><\/script><script src="app.js"><\/script>/);
   assert.match(html, /http-equiv="Content-Security-Policy"/);
 });
 
@@ -453,4 +456,330 @@ test('cad-engine.js is loadable as a classic script and a UMD global (file:// sa
   assert.equal(typeof CAD.generate, 'function');
   assert.equal(typeof CAD.toSTEP, 'function');
   assert.equal(typeof CAD.toSTL, 'function');
+});
+
+/* ----------------------------------------------------------- Audit lab */
+
+const labIds = ['lab', 'lab-nozzle', 'lab-material', 'lab-probe', 'lab-probe-label', 'lab-tbody', 'lab-mass-col',
+  'lab-xsec', 'lab-xsec-cap', 'lab-ratio', 'lab-ratio-cap', 'lab-json', 'lab-csv', 'lab-md', 'lab-share',
+  'lab-verify', 'lab-tamper', 'lab-digest', 'lab-share-url', 'lab-status', 'lab-test-count', 'lab-test-list', 'lab-run-tests'];
+
+test('lab section is present in markup with every required control id', () => {
+  const ids = [...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]);
+  for (const id of labIds) assert.ok(ids.includes(id), `#${id} missing from index.html`);
+  assert.match(html, /<section class="lab" id="lab" hidden>/, 'lab starts hidden until cad-lab.js loads');
+  assert.match(html, /<h2>Manifold &amp; Tolerance Audit Lab<\/h2>/);
+  assert.match(html, /<table id="lab-table">/);
+  assert.match(html, /<svg id="lab-xsec" tabindex="0" role="img" aria-label="[^"]+"/);
+  assert.match(html, /<svg id="lab-ratio" viewBox="0 0 360 170" tabindex="0" role="img" aria-label="[^"]+"/);
+  for (const id of ['lab-json', 'lab-csv', 'lab-md', 'lab-share', 'lab-verify', 'lab-tamper', 'lab-run-tests']) {
+    assert.match(html, new RegExp(`<button id="${id}" type="button">`), `#${id} is a real button`);
+  }
+  assert.match(html, /<input id="lab-share-url" type="text" readonly/);
+  assert.match(css, /\.lab\[hidden\]\{display:none\}/, 'hidden lab stays hidden even against author CSS');
+});
+
+test('lab section reveals and populates the four-model comparator on boot', async () => {
+  const { doc } = await boot();
+  const lab = doc.getElementById('lab');
+  assert.equal(lab.hidden, false, 'lab visible when cad-lab.js is present');
+  const rows = doc.getElementById('lab-tbody').children;
+  assert.equal(rows.length, 4, 'one comparator row per model');
+  assert.equal(rows[0].children.length, 9, 'nine comparator columns');
+  assert.equal(rows[0].children[0].textContent, CAD.DESIGNS[0].name);
+  const reports = LAB.compareModels();
+  for (let i = 0; i < rows.length; i += 1) {
+    assert.equal(rows[i].children[4].textContent, '0 / 0 / 0', `${reports[i].id} euler/boundary/non-manifold`);
+    assert.equal(rows[i].children[8].children[0].tagName, 'BUTTON', 'inspect button present');
+  }
+});
+
+test('lab stays hidden and the page still works when BakeBuildLab is absent', async () => {
+  const saved = globalThis.BakeBuildLab;
+  try {
+    delete globalThis.BakeBuildLab;
+    const { doc } = await boot();
+    assert.equal(doc.getElementById('lab').hidden, true, 'lab hidden without the module');
+    assert.equal(doc.getElementById('status').textContent, 'All geometry rules pass', 'viewer unaffected');
+    assert.equal(doc.getElementById('lab-tbody').children.length, 0, 'no lab rows rendered');
+  } finally {
+    globalThis.BakeBuildLab = saved;
+  }
+});
+
+test('lab nozzle and filament selectors populate with the supported options', async () => {
+  const { doc } = await boot();
+  const nozzle = doc.getElementById('lab-nozzle'), material = doc.getElementById('lab-material');
+  assert.deepEqual(nozzle.children.map((o) => o.value), ['0.4', '0.6']);
+  assert.deepEqual(material.children.map((o) => o.value), ['PLA', 'PETG', 'ABS']);
+  assert.equal(nozzle.value, '0.4');
+  assert.equal(material.value, 'PLA');
+});
+
+test('material change rewrites the mass column header and row masses', async () => {
+  const { doc } = await boot();
+  const material = doc.getElementById('lab-material');
+  const before = doc.getElementById('lab-tbody').children[0].children[7].textContent;
+  material.value = 'PETG';
+  material.dispatch('change');
+  assert.equal(doc.getElementById('lab-mass-col').textContent, 'Mass PETG (g)');
+  const after = doc.getElementById('lab-tbody').children[0].children[7].textContent;
+  assert.notEqual(after, before, 'mass values re-render for the chosen filament');
+  const r = LAB.compareModels()[0];
+  assert.equal(after, r.mass.PETG.toFixed(2));
+});
+
+test('switching to the keyring retargets the probe to hole diameter and highlights its row', async () => {
+  const { doc } = await boot();
+  const select = doc.getElementById('design');
+  select.value = 'orpheus_fusering_keyring';
+  select.dispatch('change');
+  assert.equal(doc.getElementById('lab-probe-label').textContent, 'Hole diameter probe (mm)');
+  assert.equal(doc.getElementById('lab-probe').value, '6', 'probe resets to the clear hole');
+  assert.equal(doc.getElementById('lab-probe').max, '20');
+  const rows = doc.getElementById('lab-tbody').children;
+  assert.equal(rows[3].className, 'sel', 'keyring row marked selected');
+  assert.equal(rows[0].className, '', 'cutter row unmarked');
+});
+
+test('probe input re-renders the dashed probe contour with its aria-label', async () => {
+  const { doc } = await boot();
+  const probe = doc.getElementById('lab-probe');
+  probe.value = '1.2';
+  probe.dispatch('input');
+  const xsec = doc.getElementById('lab-xsec');
+  const probePath = xsec.children.find((c) => c.getAttribute('class') === 'probe-line');
+  assert.ok(probePath, 'probe contour exists');
+  assert.match(probePath.getAttribute('aria-label'), /probe 1\.2 mm, ratio 3/, 'probe ratio in label');
+});
+
+test('probe change normalizes out-of-range values to per-type limits', async () => {
+  const { doc } = await boot();
+  const probe = doc.getElementById('lab-probe');
+  probe.value = '99';
+  probe.dispatch('change');
+  assert.equal(probe.value, '8', 'cutter probe clamps to 8 mm');
+  const select = doc.getElementById('design');
+  select.value = 'orpheus_fusering_keyring';
+  select.dispatch('change');
+  probe.value = '0';
+  probe.dispatch('change');
+  assert.equal(probe.value, '6', 'invalid keyring probe restores the clear hole default');
+});
+
+test('inspect buttons drive the shared 3D viewport and focus the canvas', async () => {
+  const { doc, canvas } = await boot();
+  const rows = doc.getElementById('lab-tbody').children;
+  rows[3].children[8].children[0].click();
+  assert.equal(doc.getElementById('design').value, 'orpheus_fusering_keyring');
+  assert.equal(doc.getElementById('model-name').textContent, 'Orpheus FuseRing');
+  assert.equal(doc.activeElement, canvas, 'canvas receives keyboard focus for orbit controls');
+  rows[1].children[8].children[0].click();
+  assert.equal(doc.getElementById('design').value, 'hex_gear_logic_gate_cutter');
+});
+
+test('cross-section svg draws contour, three focusable bands, probe path, and a marker', async () => {
+  const { doc } = await boot();
+  const xsec = doc.getElementById('lab-xsec');
+  const cls = xsec.children.map((c) => c.getAttribute('class'));
+  assert.deepEqual(cls.slice(0, 4), ['contour', 'band lip', 'band wall', 'band rim'], 'cutter bands drawn');
+  assert.ok(cls.includes('probe-line') && cls.includes('marker'));
+  for (const c of xsec.children.filter((c) => (c.getAttribute('class') || '').startsWith('band'))) {
+    assert.equal(c.getAttribute('tabindex'), '0', 'band contour keyboard focusable');
+    assert.equal(c.getAttribute('role'), 'img');
+    assert.match(c.getAttribute('aria-label'), /offset \d/);
+  }
+  assert.ok((xsec.getAttribute('viewBox') || '').split(' ').every((v) => Number.isFinite(Number(v))), 'viewBox set to mm extents');
+});
+
+test('keyring cross-section swaps bands for the hole polygon and clear circle', async () => {
+  const { doc } = await boot();
+  const select = doc.getElementById('design');
+  select.value = 'orpheus_fusering_keyring';
+  select.dispatch('change');
+  const xsec = doc.getElementById('lab-xsec');
+  const cls = xsec.children.map((c) => c.getAttribute('class'));
+  assert.ok(cls.includes('holeline'), 'hole boundary polygon drawn');
+  const clear = xsec.children.find((c) => c.getAttribute('class') === 'clear');
+  assert.ok(clear, 'clear hole circle drawn');
+  assert.equal(clear.getAttribute('r'), '3', 'clear circle is the 6 mm radius-3 inscribed circle');
+  assert.equal(clear.getAttribute('tabindex'), '0', 'clear circle focusable');
+});
+
+test('ratio chart renders one bar per sweep row with a threshold line and focusable bars', async () => {
+  const { doc } = await boot();
+  const chart = doc.getElementById('lab-ratio');
+  const bars = chart.children.filter((c) => (c.getAttribute('class') || '').startsWith('bar '));
+  assert.equal(bars.length, 13, 'thirteen lip sweep rows');
+  assert.ok(chart.children.some((c) => c.getAttribute('class') === 'thresh'), '2.0 threshold line drawn');
+  assert.equal(bars[0].getAttribute('tabindex'), '0');
+  assert.match(bars[0].getAttribute('aria-label'), /below threshold/, '0.4 mm lip on 0.4 mm nozzle cannot print');
+  assert.match(bars.at(-1).getAttribute('aria-label'), /printable/);
+  const probed = bars.filter((b) => (b.getAttribute('class') || '').includes(' cur'));
+  assert.equal(probed.length, 1, 'exactly the probed row is outlined');
+});
+
+test('keyring ratio chart switches to the seven hole sweep rows', async () => {
+  const { doc } = await boot();
+  const select = doc.getElementById('design');
+  select.value = 'orpheus_fusering_keyring';
+  select.dispatch('change');
+  const chart = doc.getElementById('lab-ratio');
+  const bars = chart.children.filter((c) => (c.getAttribute('class') || '').startsWith('bar '));
+  assert.equal(bars.length, 7, 'seven hole diameter rows');
+  assert.match(bars[0].getAttribute('aria-label'), /^hole 4 mm: ratio /);
+});
+
+test('nozzle change re-renders the chart and the share link', async () => {
+  const { doc } = await boot();
+  const nozzle = doc.getElementById('lab-nozzle');
+  const before = doc.getElementById('lab-share-url').value;
+  nozzle.value = '0.6';
+  nozzle.dispatch('change');
+  const after = doc.getElementById('lab-share-url').value;
+  assert.match(before, /&n=0\.4&/);
+  assert.match(after, /&n=0\.6&/, 'nozzle encoded into the share link');
+  const bars = doc.getElementById('lab-ratio').children.filter((c) => (c.getAttribute('class') || '').startsWith('bar '));
+  const printable = bars.filter((b) => (b.getAttribute('class') || '').includes('ok')).length;
+  assert.equal(printable, 5, 'on 0.6 mm nozzle only lips >= 1.2 mm print');
+});
+
+test('fingerprint shows a real SHA-256 hex digest in data-digest matching the exports', async () => {
+  const { doc, downloads } = await boot();
+  const digest = doc.getElementById('lab-digest').getAttribute('data-digest');
+  assert.match(digest, /^[0-9a-f]{64}$/, 'full hex digest stored');
+  doc.getElementById('lab-json').click();
+  const json = JSON.parse(downloads.at(-1).parts[0]);
+  assert.equal(json.integrity.digest, digest, 'JSON export digest equals on-page fingerprint');
+  doc.getElementById('lab-csv').click();
+  assert.ok(downloads.at(-1).parts[0].includes('# sha256 ' + digest), 'CSV provenance digest equals fingerprint');
+  doc.getElementById('lab-md').click();
+  assert.ok(downloads.at(-1).parts[0].includes('SHA-256 audit digest: `' + digest + '`'), 'Markdown footer digest equals fingerprint');
+});
+
+test('audit JSON export carries the schema, state, models, sweep, and probe', async () => {
+  const { doc, downloads } = await boot();
+  doc.getElementById('lab-json').click();
+  const blob = downloads.at(-1);
+  const parsed = JSON.parse(blob.parts[0]);
+  assert.equal(parsed.schema, 'bakebuild-audit/1');
+  assert.equal(parsed.state.model, 'orpheus_circuit_crest_cutter');
+  assert.equal(parsed.models.length, 4);
+  assert.equal(parsed.sweep.kind, 'lip');
+  assert.equal(parsed.sweep.rows.length, 13);
+  assert.equal(parsed.probe.kind, 'lip');
+  const anchor = doc.created.filter((el) => el.tagName === 'A').at(-1);
+  assert.equal(anchor.download, 'bakebuild-audit.json');
+});
+
+test('audit CSV export is formula-safe with four model rows and provenance', async () => {
+  const { doc, downloads } = await boot();
+  doc.getElementById('lab-csv').click();
+  const text = downloads.at(-1).parts[0];
+  const lines = text.trim().split('\n');
+  assert.equal(lines[0], '# bakebuild-studio audit brief v1');
+  assert.match(lines[1], /^# state model=orpheus_circuit_crest_cutter nozzle=0\.4 material=PLA probe=0\.8$/);
+  assert.match(lines[2], /^# sha256 [0-9a-f]{64}$/);
+  assert.match(lines[3], /^model,type,dim_x_mm/);
+  assert.equal(lines.length, 4 + 4 + 2, 'three provenance lines, header, four rows, probe header, probe row');
+  for (const line of lines.slice(4, 8)) assert.ok(!/^[=+\-@\t]/.test(line), 'no formula-leading cell');
+  const anchor = doc.created.filter((el) => el.tagName === 'A').at(-1);
+  assert.equal(anchor.download, 'bakebuild-audit.csv');
+});
+
+test('audit Markdown export contains the comparison table and digest footer', async () => {
+  const { doc, downloads } = await boot();
+  doc.getElementById('lab-md').click();
+  const text = downloads.at(-1).parts[0];
+  assert.match(text, /^## BakeBuild Studio audit brief/m);
+  assert.equal((text.match(/^\| /gm) || []).length, 6, 'header, separator, four model rows');
+  assert.match(text, /SHA-256 audit digest: `[0-9a-f]{64}`/);
+  const anchor = doc.created.filter((el) => el.tagName === 'A').at(-1);
+  assert.equal(anchor.download, 'bakebuild-audit.md');
+});
+
+test('copy share link fills the readonly field and reports through the status region', async () => {
+  const { doc } = await boot();
+  doc.getElementById('lab-share').click();
+  const field = doc.getElementById('lab-share-url');
+  assert.match(field.value, /#bbs=m=orpheus_circuit_crest_cutter&n=0\.4&f=PLA&p=0\.8$/, 'share link encodes the live state');
+  assert.ok(doc.getElementById('lab-status').textContent.length > 0, 'status line updated');
+});
+
+test('verify digest confirms the stamped SHA-256 against a fresh recomputation', async () => {
+  const { doc } = await boot();
+  doc.getElementById('lab-verify').click();
+  assert.match(doc.getElementById('lab-status').textContent, /Digest verified/);
+});
+
+test('tamper demo proves a mutated payload fails the digest check', async () => {
+  const { doc } = await boot();
+  doc.getElementById('lab-tamper').click();
+  assert.match(doc.getElementById('lab-status').textContent, /Tamper detected/);
+});
+
+test('in-page self-test runner lists every check with a passing count', async () => {
+  const { doc } = await boot();
+  doc.getElementById('lab-run-tests').click();
+  const items = doc.getElementById('lab-test-list').children;
+  assert.equal(items.length, LAB.SELF_TESTS.length, 'every self-test listed');
+  assert.ok(LAB.SELF_TESTS.length >= 16, 'at least sixteen in-page checks');
+  for (const li of items) {
+    assert.equal(li.className, 'pass', `${li.textContent} passes`);
+    assert.ok(li.textContent.startsWith('✓'), 'pass glyph prefix');
+  }
+  assert.equal(doc.getElementById('lab-test-count').textContent, `${items.length}/${items.length} passing`);
+});
+
+test('boot with a #bbs= hash restores model, nozzle, material, and probe', async () => {
+  const { doc } = await boot('#bbs=m=orpheus_fusering_keyring&n=0.6&f=PETG&p=7');
+  assert.equal(doc.getElementById('design').value, 'orpheus_fusering_keyring');
+  assert.equal(doc.getElementById('model-name').textContent, 'Orpheus FuseRing');
+  assert.equal(doc.getElementById('lab-nozzle').value, '0.6');
+  assert.equal(doc.getElementById('lab-material').value, 'PETG');
+  assert.equal(doc.getElementById('lab-probe').value, '7');
+  assert.equal(doc.getElementById('lab-probe-label').textContent, 'Hole diameter probe (mm)');
+  const digest = doc.getElementById('lab-digest').getAttribute('data-digest');
+  assert.equal(digest, LAB.auditDigest({ model: 'orpheus_fusering_keyring', nozzle: 0.6, material: 'PETG', probe: 7 }),
+    'restored state stamps the same digest');
+});
+
+test('a hostile or malformed hash is rejected and defaults apply', async () => {
+  const { doc } = await boot('#bbs=m=ghost&n=9&f=WOOD&p=-1');
+  assert.equal(doc.getElementById('design').value, CAD.DESIGNS[0].id, 'default model applies');
+  assert.equal(doc.getElementById('lab-nozzle').value, '0.4');
+  assert.equal(doc.getElementById('lab-material').value, 'PLA');
+  assert.equal(doc.getElementById('lab-probe').value, '0.8');
+});
+
+test('hashchange re-applies the encoded state without a reload', async () => {
+  const { doc, win } = await boot('#bbs=m=orpheus_circuit_crest_cutter&n=0.4&f=PLA&p=0.8');
+  win.location.hash = '#bbs=m=stepcheck_sigma_badge_cutter&n=0.6&f=ABS&p=1.4';
+  win.dispatch('hashchange');
+  assert.equal(doc.getElementById('design').value, 'stepcheck_sigma_badge_cutter');
+  assert.equal(doc.getElementById('lab-nozzle').value, '0.6');
+  assert.equal(doc.getElementById('lab-material').value, 'ABS');
+  assert.equal(doc.getElementById('lab-probe').value, '1.4');
+});
+
+test('round trip: share link from the live state reloads to the identical fields', async () => {
+  const first = await boot();
+  const sel = first.doc.getElementById('design');
+  sel.value = 'stepcheck_sigma_badge_cutter';
+  sel.dispatch('change');
+  const nozzle = first.doc.getElementById('lab-nozzle');
+  nozzle.value = '0.6';
+  nozzle.dispatch('change');
+  const material = first.doc.getElementById('lab-material');
+  material.value = 'ABS';
+  material.dispatch('change');
+  const probe = first.doc.getElementById('lab-probe');
+  probe.value = '1.4';
+  probe.dispatch('input');
+  const hash = first.doc.getElementById('lab-share-url').value.split('#')[1];
+  const second = await boot('#' + hash);
+  assert.equal(second.doc.getElementById('design').value, 'stepcheck_sigma_badge_cutter');
+  assert.equal(second.doc.getElementById('lab-nozzle').value, '0.6');
+  assert.equal(second.doc.getElementById('lab-material').value, 'ABS');
+  assert.equal(second.doc.getElementById('lab-probe').value, '1.4');
 });

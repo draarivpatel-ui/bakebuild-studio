@@ -2,6 +2,8 @@
 
 Zero-dependency local CAD workbench for three custom cookie cutters and one Orpheus FuseRing keyring. Serve this directory on any static HTTP host and open `index.html` to rotate/zoom the shaded 3D mesh, inspect dimensions and rule checks, and download STEP or STL. The workbench uses classic scripts, so `index.html` also opens directly from disk (`file://`) with no server. No external network requests, build tools, or third-party packages are needed.
 
+The page also hosts a manifold and tolerance audit lab (`cad-lab.js`): a four-model topology comparator, a nozzle wall-ratio sweep for cutter lips (0.4 to 1.6 mm) and the FuseRing hole (4 to 10 mm), true-millimetre SVG cross-section and ratio charts, and a SHA-256 digest-stamped audit brief exported as JSON, CSV, or Markdown. The lab section stays hidden if `cad-lab.js` is absent. Lab state round-trips through a strict `#bbs=` bookmark hash covering model, nozzle, filament, and probe.
+
 ## Quick start
 
 From the repository root:
@@ -31,7 +33,9 @@ STEP uses AP214-style product metadata, explicit millimetre units, shared edge/v
 
 The engine exports `generate(id)`, `validate(model)`, `toSTEP(model)`, `toSTL(model)`, `profile(design)`, `offset(points, distance)`, `signedVolume(triangles)`, `polygonSelfIntersections(points)`, `manifoldReport(triangles)`, and `depthSort(triangles)` in both Node and the browser (`globalThis.BakeBuildCAD`; `cad-engine.mjs` re-exports the same API for ES-module consumers). The validator checks generated bounds, height, band parameters, flat bottom, clear hole, and positive signed volume, and inspects the mesh itself: non-empty solids and triangles, finite coordinates, no degenerate facets, closed manifold topology, consistent winding, agreement between reported and mesh-computed volume, and contour simplicity.
 
-The 179-test suite passes on Node 26 across six files:
+The lab module (`globalThis.BakeBuildLab`) exports `compareModels()`, `lipSweep(id, nozzle)`, `holeSweep(nozzle)`, `sweepForModel(id, nozzle)`, `probeResult(id, nozzle, probe)`, `contourData(id)`, `filamentGrams(volume, material)`, `sha256Hex(text)`, `canonicalState(state)`, `encodeHash(state)`, `decodeHash(hash)`, `auditPayload(state)`, `auditDigest(state)`, `verifyDigest(payload, digest)`, `tamperPayload(payload)`, `exportJSON(state)`, `exportCSV(state)`, `exportMarkdown(state)`, and `runSelfTests()`. One canonical digest-stamped payload is cached per normalized state, so the on-page fingerprint and all three export formats always carry the same SHA-256. CSV cells are formula-escaped, and the `#bbs=` codec blocks `__proto__`/constructor keys while failing closed on malformed input.
+
+The 404-test suite passes on Node 26 across seven files:
 
 | File | Focus |
 | --- | --- |
@@ -41,5 +45,6 @@ The 179-test suite passes on Node 26 across six files:
 | `tests/hardening.test.js` | Parametric edge cases, scalar guards, offset geometry, and export determinism |
 | `tests/ui-hardening.test.js` | Keyboard-scope rules, focus rings, CSP, and offline loading contracts |
 | `tests/adversarial.test.js` | Regression tests for the hostile audit: painter-order inversions, hollow validation, offset self-intersection, ESM surface, canvas role, executable bit, STEP exponent case |
+| `tests/cad-lab.test.js` | Audit-lab checks: SHA-256 known-answer vectors and `node:crypto` parity, four-model topology comparator, lip and hole sweeps with printable-ratio gating, strict `#bbs=` codec round trips and hostile rejection, digest parity across JSON/CSV/Markdown exports, tamper detection, and CSV formula escaping |
 
 Compliance gates assert zero em-dashes, zero en-dashes, zero AI disclosures or model names, and zero personal contact details across every shipped text file. See [DEVPOST_UPGRADE.md](DEVPOST_UPGRADE.md) for the project write-up.
