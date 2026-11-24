@@ -183,7 +183,7 @@ test('index.html has exactly one h1, ordered headings, and a main landmark', () 
   for (let i = 1; i < levels.length; i += 1) {
     assert.ok(levels[i] <= levels[i - 1] + 1, `heading jump h${levels[i - 1]} to h${levels[i]}`);
   }
-  assert.match(html, /<main>/);
+  assert.match(html, /<main\b[^>]*>/);
   assert.match(html, /<footer>/);
   assert.match(html, /<header>/);
   assert.match(html, /<aside>/);
@@ -782,4 +782,14 @@ test('round trip: share link from the live state reloads to the identical fields
   assert.equal(second.doc.getElementById('lab-nozzle').value, '0.6');
   assert.equal(second.doc.getElementById('lab-material').value, 'ABS');
   assert.equal(second.doc.getElementById('lab-probe').value, '1.4');
+});
+
+test('L567 skip link targets a focusable main landmark', () => {
+  assert.match(html, /<a[^>]+class="skip-link"[^>]+href="#main-content"/);
+  assert.match(html, /<main[^>]+id="main-content"[^>]+tabindex="-1"/);
+});
+
+test('L567 stylesheet honors reduced motion and styles the skip link', () => {
+  assert.match(css, /prefers-reduced-motion:\s*reduce/);
+  assert.match(css, /\.skip-link/);
 });

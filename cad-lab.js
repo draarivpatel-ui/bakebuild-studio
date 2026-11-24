@@ -161,6 +161,9 @@
   function filamentGrams(volumeMm3, materialId) {
     const m = MATERIALS[materialId];
     if (!m) return null;
+    if (typeof volumeMm3 !== 'number' || !Number.isFinite(volumeMm3) || volumeMm3 < 0) {
+      throw new RangeError('volume_mm3 must be a finite non-negative number');
+    }
     return r3((volumeMm3 / 1000) * m.density);
   }
   function modelReport(modelId) {
@@ -308,6 +311,9 @@
     if (probe === undefined || probe === null || probe === '') probe = defaultProbe(model);
     probe = Number(probe);
     if (!Number.isFinite(probe) || probe <= 0 || probe > 50) return null;
+    const design = c.DESIGNS.find((d) => d.id === model);
+    const [probeLo, probeHi] = PROBE_LIMITS[design.type];
+    if (probe < probeLo || probe > probeHi) return null;
     return { model: String(model), nozzle, material, probe: r6(probe) };
   }
   function encodeHash(state) {
@@ -338,10 +344,18 @@
   }
 
   /* ------------------------------------ canonical payload + digest cache */
-  function stableStringify(v) {
+  function stableStringify(v, active = new Set()) {
+    if (typeof v === 'number' && !Number.isFinite(v)) throw new TypeError('canonical JSON rejects non-finite numbers');
+    if (typeof v === 'bigint') throw new TypeError('canonical JSON rejects bigint');
     if (v === null || typeof v !== 'object') return JSON.stringify(v);
-    if (Array.isArray(v)) return '[' + v.map(stableStringify).join(',') + ']';
-    return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stableStringify(v[k])).join(',') + '}';
+    if (active.has(v)) throw new TypeError('canonical JSON rejects cyclic structures');
+    active.add(v);
+    try {
+      if (Array.isArray(v)) return '[' + v.map((x) => stableStringify(x, active)).join(',') + ']';
+      return '{' + Object.keys(v).sort().map((k) => JSON.stringify(k) + ':' + stableStringify(v[k], active)).join(',') + '}';
+    } finally {
+      active.delete(v);
+    }
   }
   const payloadCache = new Map();
   // One canonical digest-stamped payload per normalized state. The page
@@ -390,7 +404,7 @@
   function csvCell(v) {
     let s = String(v);
     if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
-    if (/[",\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
+    if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
     return s;
   }
   function exportCSV(state) {

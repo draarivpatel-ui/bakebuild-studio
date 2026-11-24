@@ -476,7 +476,7 @@ test('exports return null instead of throwing on invalid states', () => {
 });
 const CSV_CASES = [
   ['=CMD()', "'=CMD()"], ['+1', "'+1"], ['-2', "'-2"], ['@handle', "'@handle"],
-  ['\t=1+1', "'\t=1+1"], ['\r=cmd', "'\r=cmd"], ['plain', 'plain'], ['1.5', '1.5'],
+  ['\t=1+1', "'\t=1+1"], ['\r=cmd', '"\'\r=cmd"'], ['plain', 'plain'], ['1.5', '1.5'],
   ['with,comma', '"with,comma"'], ['say "hi"', '"say ""hi"""'], ['a\nb', '"a\nb"'],
 ];
 for (const [input, expected] of CSV_CASES) {
@@ -553,4 +553,34 @@ test('runSelfTests reports failures instead of throwing when a check breaks', ()
   assert.equal(results[0].pass, false);
   assert.match(results[0].detail, /boom/);
   assert.equal(typeof original, 'function');
+});
+
+/* L567 regression tests: malformed physical inputs and canonical export data */
+test('L567 codec rejects probe values outside the selected model type limits', () => {
+  assert.equal(LAB.decodeHash('#bbs=m=hex_gear_logic_gate_cutter&n=0.4&f=PLA&p=8.1'), null, 'cutter lip probe above 8 mm');
+  assert.equal(LAB.decodeHash('#bbs=m=hex_gear_logic_gate_cutter&n=0.4&f=PLA&p=0.09'), null, 'cutter lip probe below 0.1 mm');
+  assert.equal(LAB.decodeHash('#bbs=m=orpheus_fusering_keyring&n=0.4&f=PLA&p=20.1'), null, 'keyring hole probe above 20 mm');
+  assert.equal(LAB.decodeHash('#bbs=m=orpheus_fusering_keyring&n=0.4&f=PLA&p=0.9'), null, 'keyring hole probe below 1 mm');
+  assert.ok(LAB.decodeHash('#bbs=m=hex_gear_logic_gate_cutter&n=0.4&f=PLA&p=8'));
+  assert.ok(LAB.decodeHash('#bbs=m=orpheus_fusering_keyring&n=0.4&f=PLA&p=20'));
+});
+
+test('L567 stableStringify rejects non-finite numbers and cyclic structures', () => {
+  for (const bad of [NaN, Infinity, -Infinity]) {
+    assert.throws(() => LAB.stableStringify({ v: bad }), /non-finite/);
+  }
+  const cyclic = { x: 1 };
+  cyclic.self = cyclic;
+  assert.throws(() => LAB.stableStringify(cyclic), /cyclic/);
+});
+
+test('L567 filamentGrams rejects negative and non-finite volumes', () => {
+  for (const bad of [-1, NaN, Infinity, -Infinity]) {
+    assert.throws(() => LAB.filamentGrams(bad, 'PLA'), /volume/i);
+  }
+  assert.equal(LAB.filamentGrams(0, 'PLA'), 0);
+});
+
+test('L567 csvCell quotes embedded carriage returns as well as newlines', () => {
+  assert.equal(LAB.csvCell('a\rb'), '"a\rb"');
 });
