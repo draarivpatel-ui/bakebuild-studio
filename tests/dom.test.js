@@ -233,7 +233,7 @@ test('stylesheet provides focus rings, reduced layout overflow, and responsive l
   assert.match(css, /:focus-visible/);
   assert.match(css, /outline:3px solid/);
   assert.match(css, /@media\(max-width:850px\)/);
-  assert.match(css, /touch-action:none/);
+  assert.match(css, /touch-action:pan-y/);
   assert.match(css, /color-scheme:dark/);
   assert.match(css, /\.pass\{color:/);
   assert.match(css, /\.fail\{color:/);
@@ -578,14 +578,14 @@ test('inspect buttons drive the shared 3D viewport and focus the canvas', async 
   assert.equal(doc.getElementById('design').value, 'hex_gear_logic_gate_cutter');
 });
 
-test('cross-section svg draws contour, three focusable bands, probe path, and a marker', async () => {
+test('cross-section svg draws contour, three named bands, probe path, and a marker', async () => {
   const { doc } = await boot();
   const xsec = doc.getElementById('lab-xsec');
   const cls = xsec.children.map((c) => c.getAttribute('class'));
   assert.deepEqual(cls.slice(0, 4), ['contour', 'band lip', 'band wall', 'band rim'], 'cutter bands drawn');
   assert.ok(cls.includes('probe-line') && cls.includes('marker'));
   for (const c of xsec.children.filter((c) => (c.getAttribute('class') || '').startsWith('band'))) {
-    assert.equal(c.getAttribute('tabindex'), '0', 'band contour keyboard focusable');
+    assert.equal(c.getAttribute('tabindex'), null, 'informational band contour stays out of the tab order');
     assert.equal(c.getAttribute('role'), 'img');
     assert.match(c.getAttribute('aria-label'), /offset \d/);
   }
@@ -603,16 +603,16 @@ test('keyring cross-section swaps bands for the hole polygon and clear circle', 
   const clear = xsec.children.find((c) => c.getAttribute('class') === 'clear');
   assert.ok(clear, 'clear hole circle drawn');
   assert.equal(clear.getAttribute('r'), '3', 'clear circle is the 6 mm radius-3 inscribed circle');
-  assert.equal(clear.getAttribute('tabindex'), '0', 'clear circle focusable');
+  assert.equal(clear.getAttribute('tabindex'), null, 'informational clear circle stays out of the tab order');
 });
 
-test('ratio chart renders one bar per sweep row with a threshold line and focusable bars', async () => {
+test('ratio chart renders one named bar per sweep row with a threshold line', async () => {
   const { doc } = await boot();
   const chart = doc.getElementById('lab-ratio');
   const bars = chart.children.filter((c) => (c.getAttribute('class') || '').startsWith('bar '));
   assert.equal(bars.length, 13, 'thirteen lip sweep rows');
   assert.ok(chart.children.some((c) => c.getAttribute('class') === 'thresh'), '2.0 threshold line drawn');
-  assert.equal(bars[0].getAttribute('tabindex'), '0');
+  assert.equal(bars[0].getAttribute('tabindex'), null, 'informational bars stay out of the tab order');
   assert.match(bars[0].getAttribute('aria-label'), /below threshold/, '0.4 mm lip on 0.4 mm nozzle cannot print');
   assert.match(bars.at(-1).getAttribute('aria-label'), /printable/);
   const probed = bars.filter((b) => (b.getAttribute('class') || '').includes(' cur'));

@@ -82,3 +82,15 @@ test('UI: shipped STL files are byte-identical to fresh generation', () => {
     assert.equal(fresh, readExport(`${d.id}.stl`), `${d.id}.stl drifted from generator`);
   }
 });
+
+test('UI: touch drag surface preserves vertical page scrolling on coarse pointers', () => {
+  assert.ok(/canvas\{[^}]*touch-action:pan-y/.test(CSS.replace(/\s+/g, '')), 'canvas must not trap vertical touch scrolling');
+  assert.ok(!/touch-action:none/.test(CSS), 'canvas must not swallow every touch pan gesture');
+});
+
+test('UI: footer copy is not dimmed below readable contrast', () => {
+  const footerRule = CSS.match(/footer\{[^}]*\}/);
+  assert.ok(footerRule, 'footer rule missing');
+  assert.ok(!/opacity\s*:/.test(footerRule[0]), footerRule[0]);
+  assert.ok(footerRule[0].includes('color:#8198a5'), footerRule[0]);
+});

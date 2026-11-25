@@ -111,13 +111,13 @@ const CAD = globalThis.BakeBuildCAD;
       xsec.replaceChildren();
       addSvg(xsec,'path',{d:path2(data.outer),'class':'contour','aria-label':'model outline'});
       for (const band of data.offsets)
-        addSvg(xsec,'path',{d:path2(band.points),'class':'band '+band.label,tabindex:'0',role:'img','aria-label':band.label+' offset '+band.width+' mm'});
+        addSvg(xsec,'path',{d:path2(band.points),'class':'band '+band.label,role:'img','aria-label':band.label+' offset '+band.width+' mm'});
       if (data.hole) {
-        addSvg(xsec,'path',{d:path2(data.hole.points),'class':'holeline',tabindex:'0',role:'img','aria-label':'hole boundary polygon'});
-        addSvg(xsec,'circle',{cx:0,cy:0,r:data.hole.clearRadius,'class':'clear',tabindex:'0',role:'img','aria-label':'clear '+data.hole.clearRadius*2+' mm hole circle'});
+        addSvg(xsec,'path',{d:path2(data.hole.points),'class':'holeline',role:'img','aria-label':'hole boundary polygon'});
+        addSvg(xsec,'circle',{cx:0,cy:0,r:data.hole.clearRadius,'class':'clear',role:'img','aria-label':'clear '+data.hole.clearRadius*2+' mm hole circle'});
       }
-      addSvg(xsec,'path',{d:path2(probeContour(data)),'class':'probe-line',tabindex:'0',role:'img','aria-label':'probe '+state.probe+' mm, ratio '+probe.ratio});
-      addSvg(xsec,'circle',{cx:data.outer[0][0],cy:-data.outer[0][1],r:E*0.02,'class':'marker',tabindex:'0',role:'img','aria-label':'model outline vertex marker'});
+      addSvg(xsec,'path',{d:path2(probeContour(data)),'class':'probe-line',role:'img','aria-label':'probe '+state.probe+' mm, ratio '+probe.ratio});
+      addSvg(xsec,'circle',{cx:data.outer[0][0],cy:-data.outer[0][1],r:E*0.02,'class':'marker',role:'img','aria-label':'model outline vertex marker'});
       xsecCap.textContent=data.type==='cutter'
         ?'Offsets: lip 0.8 mm, wall 2.0 mm, rim 5.0 mm. Dashed trace is the '+state.probe+' mm probe at nozzle ratio '+probe.ratio+'. True mm scale.'
         :'Clear '+data.hole.clearRadius*2+' mm hole circle inside its polygon. Dashed trace is the '+state.probe+' mm probe with '+probe.minRing+' mm minimum ring. True mm scale.';
@@ -134,7 +134,7 @@ const CAD = globalThis.BakeBuildCAD;
       label.textContent=LAB.MIN_WALL_RATIO+' printable threshold';
       rows.forEach((r,i)=>{
         if (r.ratio==null) return;
-        addSvg(chart,'rect',{x:(pad+i*bw+1.5).toFixed(2),y:yv(r.ratio).toFixed(2),width:Math.max(1,bw-3).toFixed(2),height:(H-pad-yv(r.ratio)).toFixed(2),'class':'bar '+(r.printable?'ok':'warn')+(r.x===state.probe?' cur':''),tabindex:'0',role:'img','aria-label':(sweep.kind==='lip'?'lip ':'hole ')+r.x+' mm: ratio '+r.ratio+(r.printable?', printable':', below threshold')});
+        addSvg(chart,'rect',{x:(pad+i*bw+1.5).toFixed(2),y:yv(r.ratio).toFixed(2),width:Math.max(1,bw-3).toFixed(2),height:(H-pad-yv(r.ratio)).toFixed(2),'class':'bar '+(r.printable?'ok':'warn')+(r.x===state.probe?' cur':''),role:'img','aria-label':(sweep.kind==='lip'?'lip ':'hole ')+r.x+' mm: ratio '+r.ratio+(r.printable?', printable':', below threshold')});
       });
       ratioCap.textContent='Sweep of '+(sweep.kind==='lip'?'lip width':'hole diameter')+' on a '+state.nozzle.toFixed(1)+' mm nozzle; the probed row is outlined.';
     }
