@@ -18,7 +18,7 @@ The STEP writer emits AP214-style product metadata, explicit millimetre, radian,
 
 ## Verification
 
-The upgraded suite has 404 tests across seven files and passes on Node 26:
+The upgraded suite has 410 tests across seven files and passes on Node 26:
 
 ```sh
 npm test
@@ -50,7 +50,7 @@ Browser testing without a browser required a small shim that preserves real even
 - STEP and STL exports that are byte-identical on regeneration and verified by independent parsers.
 - True parallel-offset wall thickness at 0.8 mm, 2.0 mm, and 5.0 mm on every contour vertex.
 - A browser workbench whose downloads are generated from the live model, not stale files.
-- 404 automated checks spanning kernel math, artifact integrity, browser interaction, audit-lab correctness, and compliance.
+- 410 automated checks spanning kernel math, artifact integrity, browser interaction, audit-lab correctness, and compliance.
 - An in-page audit lab with a four-model topology comparator, nozzle wall-ratio sweeps, true-millimetre cross-section charts, SHA-256 stamped JSON/CSV/Markdown audit briefs, and a `#bbs=` bookmark hash that restores the full lab state.
 
 ## What's next
@@ -59,4 +59,4 @@ The obvious next steps are curved spline silhouettes with exact analytic offsets
 
 ## Judge demo
 
-Serve this folder with `python3 -m http.server`, open `index.html`, switch between the three cutters and the keyring, and watch the rule list and dimensions update. Drag and zoom the mesh, then download a STEP file and an STL file. Scroll to the audit lab for the comparator table, cross-section and nozzle-ratio charts, digest-stamped exports, the tamper demo, and the in-page self-test runner. Run `npm test` to see all 404 checks pass and `npm run build` to confirm the exports regenerate without changing a byte.
+Serve this folder with `python3 -m http.server`, open `index.html`, switch between the three cutters and the keyring, and watch the rule list and dimensions update. Drag and zoom the mesh, then download a STEP file and an STL file. Scroll to the audit lab for the comparator table, cross-section and nozzle-ratio charts, digest-stamped exports, the tamper demo, and the in-page self-test runner. Run `npm test` to see all 410 checks pass and `npm run build` to confirm the exports regenerate without changing a byte.
