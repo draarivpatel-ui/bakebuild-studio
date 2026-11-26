@@ -406,7 +406,7 @@
   function csvCell(v) {
     let s = String(v);
     const first = s.replace(/^[\s\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff\ufff9-\ufffb]+/, '').charAt(0);
-    if (first !== '' && '=+-@'.includes(first)) s = "'" + s;
+    if (typeof v !== 'number' && (/^[\t\r\n]/.test(s) || (first !== '' && '=+-@'.includes(first)))) s = "'" + s;
     if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
     return s;
   }

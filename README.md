@@ -35,7 +35,7 @@ The engine exports `generate(id)`, `validate(model)`, `toSTEP(model)`, `toSTL(mo
 
 The lab module (`globalThis.BakeBuildLab`) exports `compareModels()`, `lipSweep(id, nozzle)`, `holeSweep(nozzle)`, `sweepForModel(id, nozzle)`, `probeResult(id, nozzle, probe)`, `contourData(id)`, `filamentGrams(volume, material)`, `sha256Hex(text)`, `canonicalState(state)`, `encodeHash(state)`, `decodeHash(hash)`, `auditPayload(state)`, `auditDigest(state)`, `verifyDigest(payload, digest)`, `tamperPayload(payload)`, `exportJSON(state)`, `exportCSV(state)`, `exportMarkdown(state)`, and `runSelfTests()`. One canonical digest-stamped payload is cached per normalized state, so the on-page fingerprint and all three export formats always carry the same SHA-256. CSV cells are formula-escaped, and the `#bbs=` codec blocks `__proto__`/constructor keys while failing closed on malformed input.
 
-The 415-test suite passes on Node 26 across seven files:
+The 416-test suite passes on Node 26 across seven files:
 
 | File | Focus |
 | --- | --- |

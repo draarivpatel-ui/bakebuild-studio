@@ -601,3 +601,12 @@ test('csvCell guards formula payloads hidden behind whitespace or invisible char
     assert.equal(firstContentChar, "'", input);
   }
 });
+
+test('csvCell escapes direct control prefixes and preserves negative numbers', () => {
+  for (const input of ['\tx', '\rx', '\u200b=1+1', '\u061c+2']) {
+    const escaped = LAB.csvCell(input);
+    const first = escaped.charAt(0) === '"' ? escaped.charAt(1) : escaped.charAt(0);
+    assert.equal(first, "'", input);
+  }
+  assert.equal(LAB.csvCell(-2), '-2');
+});
