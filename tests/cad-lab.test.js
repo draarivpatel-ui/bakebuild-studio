@@ -78,6 +78,11 @@ for (const s of ['bakebuild', 'orpheus_circuit_crest_cutter', 'üñíçødé', '
     assert.equal(LAB.sha256Hex(s), crypto.createHash('sha256').update(s, 'utf8').digest('hex'));
   });
 }
+test('SHA-256 UTF-8 encoding replaces lone surrogates like TextEncoder', () => {
+  for (const s of ['\ud800', '\udfff', 'a\ud800z']) {
+    assert.equal(LAB.sha256Hex(s), crypto.createHash('sha256').update(s, 'utf8').digest('hex'));
+  }
+});
 test('SHA-256 is deterministic and output format is 64 lowercase hex chars', () => {
   const a = LAB.sha256Hex('bakebuild-studio audit');
   assert.equal(a, LAB.sha256Hex('bakebuild-studio audit'));
@@ -580,7 +585,19 @@ test('L567 filamentGrams rejects negative and non-finite volumes', () => {
   }
   assert.equal(LAB.filamentGrams(0, 'PLA'), 0);
 });
+test('filamentGrams keeps huge finite volumes finite because unit conversion happens first', () => {
+  const grams = LAB.filamentGrams(1e308, 'PLA');
+  assert.ok(Number.isFinite(grams));
+  assert.ok(grams > 0);
+});
 
 test('L567 csvCell quotes embedded carriage returns as well as newlines', () => {
   assert.equal(LAB.csvCell('a\rb'), '"a\rb"');
+});
+test('csvCell guards formula payloads hidden behind whitespace or invisible characters', () => {
+  for (const input of [' =1+1', '\n+2', '\u200b@sum', '\ufeff=cmd']) {
+    const escaped = LAB.csvCell(input);
+    const firstContentChar = escaped.charAt(0) === '"' ? escaped.charAt(1) : escaped.charAt(0);
+    assert.equal(firstContentChar, "'", input);
+  }
 });

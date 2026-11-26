@@ -52,10 +52,12 @@
       let c = str.charCodeAt(i);
       if (c < 0x80) { out.push(c); }
       else if (c < 0x800) { out.push(0xc0 | (c >> 6), 0x80 | (c & 0x3f)); }
-      else if (c >= 0xd800 && c <= 0xdbff) {
+      else if (c >= 0xd800 && c <= 0xdbff && i + 1 < str.length && str.charCodeAt(i + 1) >= 0xdc00 && str.charCodeAt(i + 1) <= 0xdfff) {
         const c2 = str.charCodeAt(++i);
         const cp = 0x10000 + ((c & 0x3ff) << 10) + (c2 & 0x3ff);
         out.push(0xf0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3f), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+      } else if (c >= 0xd800 && c <= 0xdfff) {
+        out.push(0xef, 0xbf, 0xbd);
       } else { out.push(0xe0 | (c >> 12), 0x80 | ((c >> 6) & 0x3f), 0x80 | (c & 0x3f)); }
     }
     return out;
@@ -403,7 +405,8 @@
   // Formula-safe CSV cell: neutralize spreadsheet formula triggers, then quote.
   function csvCell(v) {
     let s = String(v);
-    if (/^[=+\-@\t\r]/.test(s)) s = "'" + s;
+    const first = s.replace(/^[\s\u00ad\u061c\u180e\u200b-\u200f\u202a-\u202e\u2060-\u2069\ufeff\ufff9-\ufffb]+/, '').charAt(0);
+    if (first !== '' && '=+-@'.includes(first)) s = "'" + s;
     if (/[",\r\n]/.test(s)) s = '"' + s.replace(/"/g, '""') + '"';
     return s;
   }
