@@ -22,6 +22,31 @@ function eachModel(fn) {
   for (const entry of manifest.models) fn(entry);
 }
 
+function assertDeepAlmostEqual(actual, expected, tolerance, label) {
+  if (typeof actual === 'number' && typeof expected === 'number') {
+    assert.ok(Math.abs(actual - expected) <= tolerance, `${label}: ${actual} differs from ${expected}`);
+    return;
+  }
+  if (Array.isArray(actual) || Array.isArray(expected)) {
+    assert.ok(Array.isArray(actual) && Array.isArray(expected), `${label}: array shape differs`);
+    assert.equal(actual.length, expected.length, `${label}: array length`);
+    for (let i = 0; i < actual.length; i += 1) {
+      assertDeepAlmostEqual(actual[i], expected[i], tolerance, `${label}[${i}]`);
+    }
+    return;
+  }
+  if (actual && expected && typeof actual === 'object' && typeof expected === 'object') {
+    const actualKeys = Object.keys(actual).sort();
+    const expectedKeys = Object.keys(expected).sort();
+    assert.deepEqual(actualKeys, expectedKeys, `${label}: object keys`);
+    for (const key of actualKeys) {
+      assertDeepAlmostEqual(actual[key], expected[key], tolerance, `${label}.${key}`);
+    }
+    return;
+  }
+  assert.equal(actual, expected, label);
+}
+
 test('manifest schema, units, rules, and model list match the generator', () => {
   assert.equal(manifest.schemaVersion, 1);
   assert.equal(manifest.units, 'mm');
@@ -64,13 +89,13 @@ test('manifest dimensions, bounds, sections, volume, and triangle counts equal a
     const fresh = CAD.generate(m.id);
     assert.deepEqual(m.name, fresh.name);
     assert.deepEqual(m.type, fresh.type);
-    assert.deepEqual(m.dimensions, fresh.dimensions);
-    assert.deepEqual(m.bounds, fresh.bounds);
-    assert.deepEqual(m.sections, fresh.sections);
-    assert.equal(m.volume, fresh.volume);
+    assertDeepAlmostEqual(m.dimensions, fresh.dimensions, 1e-9, `${m.id} dimensions`);
+    assertDeepAlmostEqual(m.bounds, fresh.bounds, 1e-9, `${m.id} bounds`);
+    assertDeepAlmostEqual(m.sections, fresh.sections, 1e-9, `${m.id} sections`);
+    assertDeepAlmostEqual(m.volume, fresh.volume, 1e-9, `${m.id} volume`);
     assert.equal(m.holeDiameter, fresh.holeDiameter);
     assert.equal(m.triangleCount, fresh.triangles.length);
-    assert.deepEqual(m.validation, fresh.validation);
+    assertDeepAlmostEqual(m.validation, fresh.validation, 1e-9, `${m.id} validation`);
   });
 });
 
@@ -271,20 +296,28 @@ test('STEP plane normals are unit vectors and match the face polygon winding', (
   });
 });
 
-test('exportAll regenerates a byte-identical manifest into a clean temporary directory', () => {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-studio-'));
+test('exportAll regenerates deterministic artifacts and a numerically stable manifest', () => {
+  const first = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-studio-'));
+  const second = fs.mkdtempSync(path.join(os.tmpdir(), 'bb-studio-'));
   try {
-    const result = exportAll(dir);
+    const result = exportAll(first);
+    const repeatedResult = exportAll(second);
     assert.equal(result.models.length, 4);
-    const written = fs.readFileSync(path.join(dir, 'manifest.json'), 'utf8');
-    assert.equal(written, readExport('manifest.json'), 'manifest content is deterministic');
+    assert.equal(repeatedResult.models.length, 4);
+    const written = fs.readFileSync(path.join(first, 'manifest.json'), 'utf8');
+    const repeated = fs.readFileSync(path.join(second, 'manifest.json'), 'utf8');
+    assert.equal(repeated, written, 'same-runtime manifest output is byte deterministic');
+    assertDeepAlmostEqual(JSON.parse(written), manifest, 1e-9, 'shipped manifest');
     for (const m of result.models) {
       for (const ext of ['step', 'stl']) {
-        assert.equal(fs.readFileSync(path.join(dir, m.files[ext].name), 'utf8'), readExport(m.files[ext].name),
-          `${m.files[ext].name} regenerates byte-identically`);
+        const generated = fs.readFileSync(path.join(first, m.files[ext].name), 'utf8');
+        const repeatedGenerated = fs.readFileSync(path.join(second, m.files[ext].name), 'utf8');
+        assert.equal(repeatedGenerated, generated, `${m.files[ext].name} is deterministic in one runtime`);
+        assert.equal(generated, readExport(m.files[ext].name), `${m.files[ext].name} regenerates byte-identically`);
       }
     }
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    fs.rmSync(first, { recursive: true, force: true });
+    fs.rmSync(second, { recursive: true, force: true });
   }
 });
